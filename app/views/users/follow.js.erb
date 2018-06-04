@@ -1,0 +1,8 @@
+function renderUser(userHTML) {
+  const user = document.querySelector("[data-user='<%= @user.id %>']");
+  user.replaceWith(userHTML);
+}
+
+renderUser('<%= j render @user %>');
+
+

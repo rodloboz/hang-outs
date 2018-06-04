@@ -1,0 +1,8 @@
+<li data-user=<%= user.id %>>
+  <%= user.full_name %>
+  <% if current_user.is_following?(user.id) %>
+    <%= link_to "Unfollow", unfollow_user_path(user.id), method: :post %>
+  <% else %>
+    <%= link_to "Follow", follow_user_path(user.id), method: :post %>
+  <% end %>
+</li>

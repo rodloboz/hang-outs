@@ -1,8 +1,14 @@
 <li data-user=<%= user.id %>>
   <%= user.full_name %>
   <% if current_user.is_following?(user.id) %>
-    <%= link_to "Unfollow", unfollow_user_path(user.id), method: :post %>
+    <%= link_to "Unfollow", unfollow_user_path(user.id), method: :post, remote: true %>
   <% else %>
-    <%= link_to "Follow", follow_user_path(user.id), method: :post %>
+    <%= link_to "Follow", follow_user_path(user.id), method: :post, remote: true %>
+  <% end %>
+  |
+  <% if request = current_user.find_friend_request(user.id) %>
+    <%= link_to "Cancel Friend Request", friend_request_path(request, user_id: user.id), method: :delete, remote: true %>
+  <% else %>
+    <%= link_to "Send Friend Request", friend_requests_path(friend_id: user.id), method: :post, remote: true %>
   <% end %>
 </li>

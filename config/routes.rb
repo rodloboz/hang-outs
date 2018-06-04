@@ -8,4 +8,6 @@ Rails.application.routes.draw do
       post :unfollow
     end
   end
+  resources :friend_requests, only: [:index, :create, :update, :destroy]
+  resources :friendships, only: :index
 end

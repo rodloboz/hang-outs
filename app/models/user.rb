@@ -4,6 +4,12 @@ class User < ApplicationRecord
   devise :database_authenticatable, :registerable,
          :recoverable, :rememberable, :trackable, :validatable
 
+  has_many :friend_requests, dependent: :destroy
+  has_many :pending_friends, through: :friend_requests, source: :friend
+
+  has_many :friendships, dependent: :destroy
+  has_many :friends, through: :friendships
+
   has_many :follower_relationships, foreign_key: :following_id, class_name: 'Follow'
   has_many :followers, through: :follower_relationships, source: :follower
 
@@ -21,6 +27,10 @@ class User < ApplicationRecord
   def is_following?(user_id)
     relationship = Follow.find_by(follower_id: id, following_id: user_id)
     return true if relationship
+  end
+
+  def find_friend_request(user_id)
+    FriendRequest.find_by(friend_id: user_id, user_id: id)
   end
 
   def full_name

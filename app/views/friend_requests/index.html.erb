@@ -1,0 +1,21 @@
+<h1>Friend Requests</h1>
+
+<h2>Sent</h2>
+<ul>
+  <% @outgoing.each do |request| %>
+    <li>
+      To: <%= request.friend.full_name %>
+      <%= link_to "Cancel", friend_request_path(request, user_id: request.friend.id), method: :delete %>
+    </li>
+  <% end %>
+</ul>
+
+<h2>From</h2>
+<ul>
+  <% @incoming.each do |request| %>
+    <li>
+      From: <%= request.user.full_name %>
+      <%= link_to "Accept", friend_request_path(request), method: :put %>
+    </li>
+  <% end %>
+</ul>

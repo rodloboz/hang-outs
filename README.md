@@ -404,7 +404,6 @@ class MessagesController < ApplicationController
 
   def create
     @message = @chat.messages.new(message_params)
-    @messages = @chat.messages.order(created_at: :desc)
     if @message.save
       redirect_to chat_messages_path(@chat)
     end
@@ -421,7 +420,7 @@ class MessagesController < ApplicationController
   end
 end
 ```
-NOTE that I have deliberately left out any authorization scheme, which means that our private chats are available for any user o eavesdrop. You should set up an authorization system to protect these actions, for example with `Pundit` policies - a user can only access chats where they are either a sender or a recipient.
+NOTE that I have deliberately left out any authorization scheme, which means that our private chats are available for any user to eavesdrop. You should set up an authorization system to protect these actions, for example with `Pundit` policies - a user can only access chats where they are either a sender or a recipient.
 
 Don't forget to nest the routes:
 ```ruby
@@ -429,8 +428,8 @@ resources :chats, only: [:index, :create] do
    resources :messages, only: [:index, :create]
 end
 ```
-#### Action Cable
-Now let's configure ActionCable, which integrates integrates WebSockets in Rails and allows you to write real time features with server-side logic in Ruby and client-side in JavaScript.
+#### ActionCable
+Now let's configure ActionCable, which integrates WebSockets in Rails and allows you to write real time features with server-side logic in Ruby and client-side in JavaScript.
 
 Mount the ActionCable server in your `routes.rb` file:
 ```ruby
@@ -443,16 +442,16 @@ Edit your `development.rb` environment file and add the following:
 
 Rails.application.configure do
 # ...
-config.action_cable.url = "ws://localhost:3000/cable"
+  config.action_cable.url = "ws://localhost:3000/cable"
 end
 ```
 
-First let's generate a channel for our chat which will create the file `app/channels/chat_channel.rb`
+Let's generate a channel for our chat and create the file `app/channels/chat_channel.rb`
 
 ```bash
 rails g channel chat
 ```
-We need to make sure that Action Cable only broadcasts to authenticated users. Inside the `app/channels/application_cable` folder that was generated when you created your application, you can find a `connection.rb` file that is responsible for WebSocket authentication. Make the following changes:
+We need to make sure that ActionCable only broadcasts to authenticated users. Inside the `app/channels/application_cable` folder that was generated when you created your application, you can find a `connection.rb` file that is responsible for WebSocket authentication. Make the following changes:
 ```ruby
 module ApplicationCable
   class Connection < ActionCable::Connection::Base
@@ -525,7 +524,7 @@ $ touch app/javascrip/components/messages.js
 And modify accordingly:
 ```javascript
 // app/javascrip/client/cable.js
-import cable from "actioncable";
+import cable from 'actioncable';
 
 let consumer;
 
@@ -570,7 +569,7 @@ Finally, let's add our js to send messages that will be picked up by our ChatCha
 // app/javascript/components/message-form.js
 
 // we need to import sendMessage from our client/chat.js
-import { sendMessage } from "../client/chat";
+import { sendMessage } from '../client/chat';
 
 function submitMessage(inputMessage, inputChatId) {
   // Invokes sendMessage, that, in turn, invokes Ruby send_message method

@@ -642,3 +642,8 @@ import '../components/messages.js';
 ```
 
 NOTE that the Javascript part may have to be modified and adapted to the way you organize and name your HTML and CSS components.
+
+For a more detailed explanation please visit the links below. The live chat was inspired by and adapted from:
+https://evilmartians.com/chronicles/evil-front-part-3
+https://code4startup.com/
+https://gorails.com/

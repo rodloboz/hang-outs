@@ -1,0 +1,20 @@
+<div style="margin-top: 30px; height: calc(100vh - 130px);">
+  <div class="chat">
+    <div class="messages">
+      <div class="messages--content">
+        <%= render @messages %>
+      </div>
+    </div>
+    <div class="chat--form">
+      <%= form_for [@chat, @message] do |f| %>
+        <div class="message-form">
+          <%= f.text_field :body, placeholder: "Type message", autofocus: true, class: "message-form--input" %>
+          <%= f.hidden_field :chat_id, value: @chat.id %>
+          <%= f.submit "Send", class: "message-form--submit" %>
+        </div>
+      <% end %>
+    </div>
+  </div>
+</div>
+
+

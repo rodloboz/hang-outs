@@ -36,4 +36,12 @@ class User < ApplicationRecord
   def full_name
     "#{first_name} #{last_name}"
   end
+
+  def sender?(conversation)
+    self == conversation.sender
+  end
+
+  def recipient?(conversation)
+    self == conversation.recipient
+  end
 end

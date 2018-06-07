@@ -11,4 +11,8 @@
   <% else %>
     <%= link_to "Send Friend Request", friend_requests_path(friend_id: user.id), method: :post, remote: true %>
   <% end %>
+  |
+  <% if current_user %>
+    <%= link_to "Chat", chats_path(sender_id: current_user.id, recipient_id: user.id), method: :post %>
+  <% end %>
 </li>

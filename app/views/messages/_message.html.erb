@@ -1,0 +1,15 @@
+<div class="message">
+  <div class="message--header">
+    <span class="message--author">
+      <%= message.user.first_name %>
+    </span>
+    <span class="message--time">
+      <%= message.message_time %>
+    </span>
+  </div>
+  <div class="message--text">
+    <% message.body.lines.each do |line| %>
+      <p><%= line %></p>
+    <% end %>
+  </div>
+</div>

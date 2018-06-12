@@ -9,7 +9,7 @@ function loadNotifications() {
         })
   .then(response => response.json())
   .then(data => {
-    renderCounter(data.array.length);
+    refreshCounter(data.array.length);
     refreshNotifications(renderNotifications(data.array));
   })
 };
@@ -28,12 +28,6 @@ function markAsRead() {
       refreshCounter(0);
     }
   })
-};
-
-function renderCounter(number) {
-  counter.insertAdjacentHTML('afterbegin',
-    `<span id="counter" class="notifications text-center">${number}</span>`
-  )
 };
 
 function refreshCounter(number) {
@@ -63,7 +57,10 @@ const notifications = document.querySelector('[data-behavior="notifications"]');
 const counter = document.querySelector('[data-behavior="notifications-counter"]');
 
 if (notifications) {
-  loadNotifications()
+  loadNotifications();
+  setInterval(() => {
+    loadNotifications();
+  }, 5000);
 }
 
 if (counter) {

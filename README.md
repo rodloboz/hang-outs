@@ -794,6 +794,7 @@ Finally, we set up the navbar dropdown menu to receive the notifications:
 
       <!-- Avatar with dropdown menu -->
       <div class="navbar-wagon-item" data-behavior="notifications-counter">
+        <span id="counter" class="notifications text-center"></span>
         <div class="dropdown" data-behavior="notifications">
           <%= image_tag "http://kitt.lewagon.com/placeholder/users/ssaunier", class: "avatar dropdown-toggle", id: "navbar-wagon-menu", "data-toggle" => "dropdown" %>
           <ul class="dropdown-menu dropdown-menu-right navbar-wagon-dropdown-menu">
@@ -827,19 +828,18 @@ function loadNotifications() {
         })
   .then(response => response.json())
   .then(data => {
-    renderCounter(data.array.length);
+    refreshCounter(data.array.length);
     refreshNotifications(renderNotifications(data.array));
   })
 };
 ```
-`renderCounter` will add a `<span>` element to the navbar with the number of unread notifications for the current user:
+`refreshCounter` will update the `<span>` element in the navbar with the number of unread notifications for the current user:
 ```javascript
 // app/javacript/components/notifications.js
 
-function renderCounter(number) {
-  counter.insertAdjacentHTML('afterbegin',
-    `<span id="counter" class="notifications text-center">${number}</span>`
-  )
+function refreshCounter(number) {
+  const counterElement = document.getElementById('counter');
+  counterElement.innerHTML = number;
 };
 ```
 `renderNotifications` will return a string with the HTML for all the notifications and `refreshNotifications` takes an HTML string and adds it to the dropdown in the notifications section:
@@ -864,7 +864,7 @@ function refreshNotifications(notificationsHTML) {
   notifications.innerHTML = notificationsHTML;
 };
 ```
-We also need a function to mark messages as read once the user clicks on the navbar to open the dropdown and a function to update the unread messages counter:
+We also need a function to mark messages as read once the user clicks on the navbar to open the dropdown:
 ```javascript
 // app/javacript/components/notifications.js
 
@@ -883,11 +883,6 @@ function markAsRead() {
     }
   })
 };
-
-function refreshCounter(number) {
-  const counterElement = document.getElementById('counter');
-  counterElement.innerHTML = number;
-};
 ```
 
 Finally, we set up the logic at the end of the file:
@@ -898,10 +893,14 @@ const notifications = document.querySelector('[data-behavior="notifications"]');
 const counter = document.querySelector('[data-behavior="notifications-counter"]');
 
 if (notifications) {
-  loadNotifications()
+  loadNotifications();
+  setInterval(() => {
+    loadNotifications();
+  }, 5000);
 }
 
 if (counter) {
   counter.addEventListener('click', markAsRead)
 }
 ```
+Here we're faking real time notification with a `setInterval` that checks for new notifications every 5 seconds.

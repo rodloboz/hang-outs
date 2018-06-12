@@ -1,18 +1,4 @@
-function loadNotifications() {
-  fetch('/notifications', {
-          method: 'get',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-CSRF-Token': Rails.csrfToken()
-          },
-          credentials: 'same-origin'
-        })
-  .then(response => response.json())
-  .then(data => {
-    refreshCounter(data.array.length);
-    refreshNotifications(renderNotifications(data.array));
-  })
-};
+import { setCallback } from '../client/notifications';
 
 function markAsRead() {
   fetch('/notifications/mark_as_read', {
@@ -35,36 +21,17 @@ function refreshCounter(number) {
   counterElement.innerHTML = number;
 };
 
-function renderNotifications(notifications) {
-  return notifications.map(notification => {
-    return(
-      `<li class="notification">
-      <strong>${notification.actor}</strong>
-      ${notification.action}
-      ${notification.notifiable.type}
-      </li>
-      `
-    )
-  }).join('');
-};
+const counterTrigger = document.querySelector('[data-behavior="notifications-counter"]');
+const notifications = document.getElementById('notifications');
+const counter = document.getElementById('counter');
 
-function refreshNotifications(notificationsHTML) {
-  const notifications = document.getElementById('notifications');
-  notifications.innerHTML = notificationsHTML;
-};
-
-const notifications = document.querySelector('[data-behavior="notifications"]');
-const counter = document.querySelector('[data-behavior="notifications-counter"]');
-
-if (notifications) {
-  loadNotifications();
-  setInterval(() => {
-    loadNotifications();
-  }, 5000);
+if (notifications && counter) {
+  setCallback(({notification, count}) => {
+    notifications.insertAdjacentHTML("afterbegin", notification);
+    counter.innerHTML = count;
+  });
 }
 
-if (counter) {
-  counter.addEventListener('click', markAsRead)
+if (counterTrigger) {
+  counterTrigger.addEventListener('click', markAsRead)
 }
-
-

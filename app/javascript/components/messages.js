@@ -2,8 +2,6 @@ import { setCallback } from 'client/chat';
 
 function scrollToBottom(element) {
   // eslint-disable-next-line
-  console.log(element.scrollTop)
-  console.log(element.scrollHeight)
   element.scrollTop = element.scrollHeight;
 }
 

@@ -904,3 +904,223 @@ if (counter) {
 }
 ```
 Here we're faking real time notification with a `setInterval` that checks for new notifications every 5 seconds.
+
+#### Realtime notifications with ActionCable
+
+##### 1) Setup
+In order to use ActionCable, we'll have to change a lot of our previous code.
+
+Let's begin by configuring ActionCable, which integrates integrates WebSockets in Rails and allows you to write real time features with server-side logic in Ruby and client-side in JavaScript.
+
+```ruby
+# config/cable.yml
+development:
+  adapter: redis
+  url: redis://localhost:6379/1
+ ```
+ Then we create a channel for Notifications:
+ ```bash
+ $ rails g channel Notifications
+ ```
+ And scope it to the `current_user`:
+ ```ruby
+ # app/channels/notifications_channel.rb
+
+ class NotificationsChannel < ApplicationCable::Channel
+  def subscribed
+    stream_from "notifications:#{current_user.id}"
+  end
+
+  def unsubscribed
+    stop_all_streams
+  end
+end
+```
+We'll need to configure ActionCable to only connect to Devise logged in users:
+ ```ruby
+ # app/channels/application_cable/connection.rb
+
+ module ApplicationCable
+  class Connection < ActionCable::Connection::Base
+    identified_by :current_user
+
+    def connect
+      self.current_user = find_verified_user
+      logger.add_tags "ActionCable", "User #{current_user.id}"
+    end
+
+    protected
+
+    def find_verified_user
+      if current_user = env['warden'].user
+        current_user
+      else
+        reject_unauthorized_connection
+      end
+    end
+  end
+end
+```
+##### 2) Views
+Let's refactor our navbar:
+```html
+<!-- Right Navigation -->
+  <div class="navbar-wagon-right hidden-xs hidden-sm">
+
+    <% if user_signed_in? %>
+
+      <!-- Avatar with dropdown menu -->
+      <div class="navbar-wagon-item" data-behavior="notifications-counter">
+        <span id="counter" class="notifications text-center"></span>
+        <div class="dropdown" data-behavior="notifications">
+          <%= image_tag "http://kitt.lewagon.com/placeholder/users/ssaunier", class: "avatar dropdown-toggle", id: "navbar-wagon-menu", "data-toggle" => "dropdown" %>
+          <ul class="dropdown-menu dropdown-menu-right navbar-wagon-dropdown-menu">
+            <div id="notifications">
+              <% current_user.notifications.unread.each do |notification| %>
+                <%= render partial: "notifications/#{notification.notifiable_type.underscore.pluralize}/#{notification.action}", locals: {notification: notification} %>
+              <% end %>
+            </div>
+          </ul>
+        </div>
+      </div>
+
+     <% end %>
+  </div>
+```
+We'll need a partial for each `notifiable_type` so we can render different html for different types of notifications:
+```html
+<!-- app/views/notifications/follows/_started.html.erb -->
+
+<li class="notification">
+  <strong><%= notification.actor.full_name %></strong>
+  <%= notification.action %>
+  following you!
+</li>
+```
+```html
+<!-- app/views/notifications/friend_requests/_sent.html.erb -->
+
+<li class="notification">
+  <strong><%= notification.actor.full_name %></strong>
+  <%= notification.action %>
+  you a friend request.
+</li>
+```
+##### 3) Sending Notifications
+We'll broadcast to the ActionCable notifications channel with a background job.
+```bash
+$ rails g job NotificationRelay
+```
+```ruby
+# app/jobs/notification_relay_job.rb
+
+class NotificationRelayJob < ApplicationJob
+  queue_as :default
+
+  def perform(notification, count)
+    html = ApplicationController.render partial: "notifications/#{notification.notifiable_type.underscore.pluralize}/#{notification.action}", locals: {notification: notification}, formats: [:html]
+    ActionCable.server.broadcast "notifications:#{notification.recipient_id}", notification: html, count: count
+  end
+end
+```
+And we'll trigger the job inside the Notification model in through a callback:
+```ruby
+class Notification < ApplicationRecord
+  after_commit -> { NotificationRelayJob.perform_later(self, count) }
+  #...
+
+  private
+
+  def count
+    recipient.notifications.unread.size
+  end
+end
+```
+##### 4) Consuming Notifications
+Let's add the actioncable js so we can use it inside our packs components:
+```bash
+$ yarn add actioncable
+```
+And create the necessary files and folders:
+```bash
+$ mkdir app/javascrip/client
+$ touch app/javascrip/client/cable.js
+$ touch app/javascript/client/notifications.js
+```
+And modify accordingly:
+```javascript
+// app/javascrip/client/cable.js
+import cable from 'actioncable';
+
+let consumer;
+
+function createChannel(...args) {
+  if (!consumer) {
+    consumer = cable.createConsumer();
+  }
+
+  return consumer.subscriptions.create(...args);
+}
+
+export default createChannel;
+```
+```javascript
+// app/javascript/client/notifications.js
+import createChannel from 'client/cable';
+
+let callback; // declaring a variable that will hold a function later
+
+const notifications = createChannel('NotificationsChannel', {
+  received(data) {
+    if (callback) callback.call(null, data);
+  }
+});
+
+function setCallback(fn) {
+  callback = fn;
+}
+
+export { setCallback };
+```
+Finally, let's modify the `components/notifications.js` component we created in the preveious section in order to render notifications picked up over ActionCable through the NotificationsChannel. You'll notice that it became a lot lighter:
+```javascript
+// app/javascript/components/notifications.js
+import { setCallback } from '../client/notifications';
+
+function markAsRead() {
+  fetch('/notifications/mark_as_read', {
+          method: 'post',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-Token': Rails.csrfToken()
+          },
+          credentials: 'same-origin'
+        })
+  .then(response => {
+    if (response.status === 200) {
+      refreshCounter(0);
+    }
+  })
+};
+
+function refreshCounter(number) {
+  const counterElement = document.getElementById('counter');
+  counterElement.innerHTML = number;
+};
+
+const counterTrigger = document.querySelector('[data-behavior="notifications-counter"]');
+const notifications = document.getElementById('notifications');
+const counter = document.getElementById('counter');
+
+if (notifications && counter) {
+  setCallback(({notification, count}) => {
+    notifications.insertAdjacentHTML("afterbegin", notification);
+    counter.innerHTML = count;
+  });
+}
+
+if (counterTrigger) {
+  counterTrigger.addEventListener('click', markAsRead)
+}
+```
+That's it! Your app should be ready to receive realtime notifications.

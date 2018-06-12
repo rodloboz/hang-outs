@@ -16,7 +16,7 @@
 
       <!-- Avatar with dropdown menu -->
       <div class="navbar-wagon-item" data-behavior="notifications-counter">
-        <span id="counter" class="notifications text-center"></span>
+        <span id="counter" class="notifications text-center"><%= current_user.notifications.unread.size %></span>
         <div class="dropdown" data-behavior="notifications">
           <%= image_tag "http://kitt.lewagon.com/placeholder/users/ssaunier", class: "avatar dropdown-toggle", id: "navbar-wagon-menu", "data-toggle" => "dropdown" %>
           <ul class="dropdown-menu dropdown-menu-right navbar-wagon-dropdown-menu">
@@ -27,7 +27,9 @@
             </li>
             <hr>
             <div id="notifications">
-              <%#= render @notifications %>
+              <% current_user.notifications.unread.each do |notification| %>
+                <%= render partial: "notifications/#{notification.notifiable_type.underscore.pluralize}/#{notification.action}", locals: {notification: notification} %>
+              <% end %>
             </div>
           </ul>
         </div>

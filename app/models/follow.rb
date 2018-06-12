@@ -4,9 +4,9 @@ class Follow < ApplicationRecord
 
   after_create :create_notification
 
-  def notification_to_s
-    "following you"
-  end
+  # def notification_to_s
+  #   "following you"
+  # end
 
   private
 

@@ -12,6 +12,12 @@ class FriendRequestsController < ApplicationController
     @friend_request = current_user.friend_requests.new(friend: friend)
 
     if @friend_request.save
+      Notification.create(
+        recipient: friend,
+        actor: current_user,
+        action: 'sent',
+        notifiable: @friend_request
+      )
       respond_to do |format|
         format.html { redirect_to root_path }
         format.js
@@ -21,6 +27,12 @@ class FriendRequestsController < ApplicationController
 
   def update
     @friend_request.accept
+    Notification.create(
+      recipient: @friend_request.friend,
+      actor: current_user,
+      action: 'accepted',
+      notifiable: @friend_request
+    )
     redirect_to friendships_path
   end
 

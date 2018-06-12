@@ -33,6 +33,21 @@
 .navbar-wagon-item {
   cursor: pointer;
   padding: 0 20px;
+  position: relative;
+}
+
+.notifications {
+  position: absolute;
+  top: -5px;
+  right: 15px;
+  width: 20px;
+  height: 20px;
+  background: red;
+  color: white;
+  font-size: 12px;
+  border-radius: 50%;
+  z-index: 999;
+  line-height: 20px;
 }
 
 /* Navbar link */
@@ -50,6 +65,7 @@
   margin-top: 15px;
   box-shadow: 1px 1px 4px #E6E6E6;
   border-color: #E6E6E6;
+  min-width: 300px;
 }
 .navbar-wagon-dropdown-menu li > a {
   transition: color 0.3s ease;
@@ -59,6 +75,16 @@
   line-height: 22px !important;
   padding: 10px 20px;
 }
+
+.navbar-wagon-dropdown-menu li > span {
+  transition: color 0.3s ease;
+  font-weight: lighter !important;
+  color: #999999 !important;
+  font-size: 15px !important;
+  line-height: 22px !important;
+  padding: 10px 20px;
+}
+
 .navbar-wagon-dropdown-menu li > a:hover {
   background: transparent !important;
   color: black !important;

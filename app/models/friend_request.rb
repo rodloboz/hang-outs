@@ -6,4 +6,8 @@ class FriendRequest < ApplicationRecord
     user.friends << friend
     destroy
   end
+
+  def notification_to_s
+    "you a friend request"
+  end
 end

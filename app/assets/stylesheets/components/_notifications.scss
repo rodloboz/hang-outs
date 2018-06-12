@@ -1,0 +1,11 @@
+.notification {
+  transition: background 0.3s ease;
+  font-weight: lighter !important;
+  color: #999999 !important;
+  font-size: 14px !important;
+  line-height: 16px !important;
+  padding: 10px 20px;
+  &:hover {
+    background: rgba(230,230,230,0.8);
+  }
+}

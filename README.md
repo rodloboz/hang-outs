@@ -8,6 +8,7 @@ Rails app generated with [lewagon/rails-templates](https://github.com/lewagon/ra
 * [Following users](#following-users)
 * [Mutual friendship](#mutual-friendship)
 * [Live chat](#live-chat)
+* [In App Notifications](#in-app-notifications)
 
 
 ## Getting started
@@ -404,6 +405,7 @@ class MessagesController < ApplicationController
 
   def create
     @message = @chat.messages.new(message_params)
+    @messages = @chat.messages.order(created_at: :desc)
     if @message.save
       redirect_to chat_messages_path(@chat)
     end
@@ -420,7 +422,7 @@ class MessagesController < ApplicationController
   end
 end
 ```
-NOTE that I have deliberately left out any authorization scheme, which means that our private chats are available for any user to eavesdrop. You should set up an authorization system to protect these actions, for example with `Pundit` policies - a user can only access chats where they are either a sender or a recipient.
+NOTE that I have deliberately left out any authorization scheme, which means that our private chats are available for any user o eavesdrop. You should set up an authorization system to protect these actions, for example with `Pundit` policies - a user can only access chats where they are either a sender or a recipient.
 
 Don't forget to nest the routes:
 ```ruby
@@ -428,8 +430,8 @@ resources :chats, only: [:index, :create] do
    resources :messages, only: [:index, :create]
 end
 ```
-#### ActionCable
-Now let's configure ActionCable, which integrates WebSockets in Rails and allows you to write real time features with server-side logic in Ruby and client-side in JavaScript.
+#### Action Cable
+Now let's configure ActionCable, which integrates integrates WebSockets in Rails and allows you to write real time features with server-side logic in Ruby and client-side in JavaScript.
 
 Mount the ActionCable server in your `routes.rb` file:
 ```ruby
@@ -442,16 +444,16 @@ Edit your `development.rb` environment file and add the following:
 
 Rails.application.configure do
 # ...
-  config.action_cable.url = "ws://localhost:3000/cable"
+config.action_cable.url = "ws://localhost:3000/cable"
 end
 ```
 
-Let's generate a channel for our chat and create the file `app/channels/chat_channel.rb`
+First let's generate a channel for our chat which will create the file `app/channels/chat_channel.rb`
 
 ```bash
 rails g channel chat
 ```
-We need to make sure that ActionCable only broadcasts to authenticated users. Inside the `app/channels/application_cable` folder that was generated when you created your application, you can find a `connection.rb` file that is responsible for WebSocket authentication. Make the following changes:
+We need to make sure that Action Cable only broadcasts to authenticated users. Inside the `app/channels/application_cable` folder that was generated when you created your application, you can find a `connection.rb` file that is responsible for WebSocket authentication. Make the following changes:
 ```ruby
 module ApplicationCable
   class Connection < ActionCable::Connection::Base
@@ -524,7 +526,7 @@ $ touch app/javascrip/components/messages.js
 And modify accordingly:
 ```javascript
 // app/javascrip/client/cable.js
-import cable from 'actioncable';
+import cable from "actioncable";
 
 let consumer;
 
@@ -569,7 +571,7 @@ Finally, let's add our js to send messages that will be picked up by our ChatCha
 // app/javascript/components/message-form.js
 
 // we need to import sendMessage from our client/chat.js
-import { sendMessage } from '../client/chat';
+import { sendMessage } from "../client/chat";
 
 function submitMessage(inputMessage, inputChatId) {
   // Invokes sendMessage, that, in turn, invokes Ruby send_message method
@@ -643,6 +645,263 @@ import '../components/messages.js';
 NOTE that the Javascript part may have to be modified and adapted to the way you organize and name your HTML and CSS components.
 
 For a more detailed explanation please visit the links below. The live chat was inspired by and adapted from:
-https://evilmartians.com/chronicles/evil-front-part-3
-https://code4startup.com/
-https://gorails.com/
+* https://evilmartians.com/chronicles/evil-front-part-3
+* https://code4startup.com/
+* https://gorails.com/
+
+## In App Notifications
+
+Let's build a live notification system with action cable.
+
+#### Setting up the backend
+
+The `Notification` model is a bit out of the ordinary. It needs to have the following attributes:
+* `recipient_id` : the User instance that is being notified (who received the notification).
+* `actor_id` : the User instance who trigger the notification (e.g., sends a request/shares a photo)
+* `read_at` : a timestamp to help us know if a recipient user has already seen/read a notification
+* `action` : a string describing the action (e.g, "sent a", "shared a", etc)
+* `notifiable_type`: the type of object being tracked (e.g., `FriendshipRequest`, `Like`, `Comment`, `Photo`, etc)
+* `notifiable_id` : the ID of the object being tracked
+
+NOTE that with `notifiable_id` and `notifiable_type` we're going to be using polymorphic associations - there's not sense in making a notification class for each type of object we want to track. You can read more about this special type of associations [here](http://guides.rubyonrails.org/association_basics.html#polymorphic-associations).
+
+Let's use the generator and create our model:
+```bash
+rails g model Notification recipient_id:integer actor_id:integer read_at:datetime action:string notifiable_id:integer notifiable_type:string
+```
+Update the Notification and User models:
+```ruby
+class Notification < ApplicationRecord
+  belongs_to :recipient, class_name: 'User'
+  belongs_to :actor, class_name: 'User'
+  belongs_to :notifiable, polymorphic: true
+
+  scope :unread, -> { where(read_at: nil) }
+end
+```
+```ruby
+class User < ApplicationRecord
+ # ...
+ has_many :notifications, foreign_key: :recipient_id
+end
+```
+After this you can create Notifications always anywhere in your app - in controllers or in callbacks in your models. For this example we're going to be adding notifications when a user sends a friendship request to another user and when a user follows another user.
+
+In the first case, we'll set up our notification creation in the controller and in the second in a `after_create` callback. First let's add a helper method in our notifiable models to help render the notification message:
+```ruby
+class FriendRequest < ApplicationRecord
+ # ...
+  def notification_to_s
+    "you a friend request"
+  end
+end
+```
+```ruby
+class Follow < ApplicationRecord
+ # ...
+  def notification_to_s
+    "following you"
+  end
+end
+```
+Then we'll create a notification every time a friendship request is saved:
+```ruby
+# app/controllers/friendship_requests_controller.rb
+  def create
+    friend = User.find(params[:friend_id])
+    @friend_request = current_user.friend_requests.new(friend: friend)
+
+    if @friend_request.save
+      Notification.create(
+        recipient: friend,
+        actor: current_user,
+        action: 'sent',
+        notifiable: @friend_request
+      )
+      respond_to do |format|
+        format.html { redirect_to root_path }
+        format.js
+      end
+    end
+  end
+```
+And every time a Follow instance is created:
+```ruby
+class Follow < ApplicationRecord
+  after_create :create_notification
+ # ...
+  private
+
+  def create_notification
+    Notification.create(
+      recipient: following,
+      actor: follower,
+      action: 'started',
+      notifiable: self
+    )
+  end
+end
+```
+
+We could render notifications on the server side, but we'll be adding them with javascript to a dropdown in the navbar. For that we need to set up an endpoint to return json of the unread notifications for the current user. We'll also need a post endpoint to mark messages as read:
+```ruby
+Rails.application.routes.draw do
+  # ...
+  resources :notifications, only: [:index] do
+    collection do
+      post :mark_as_read
+    end
+  end
+end
+```
+We need the corresponding Notifications controller:
+```ruby
+class NotificationsController < ApplicationController
+  before_action :authenticate_user!
+  before_action :set_notifications
+
+  def index; end
+
+  def mark_as_read
+    @notifications.update_all(read_at: Time.zone.now)
+    render json: { sucess: true}, status: :ok
+  end
+
+  private
+
+  def set_notifications
+    @notifications = Notification.where(recipient: current_user).unread
+  end
+end
+```
+And the view for our `notifications#index` which will render json:
+```ruby
+json.array @notifications do |notification|
+  json.id notification.id
+  json.actor notification.actor.full_name
+  json.action notification.action
+  json.notifiable do
+    json.type notification.notifiable.notification_to_s
+  end
+end
+```
+Finally, we set up the navbar dropdown menu to receive the notifications:
+```html
+<!-- Right Navigation -->
+  <div class="navbar-wagon-right hidden-xs hidden-sm">
+
+    <% if user_signed_in? %>
+
+      <!-- Avatar with dropdown menu -->
+      <div class="navbar-wagon-item" data-behavior="notifications-counter">
+        <div class="dropdown" data-behavior="notifications">
+          <%= image_tag "http://kitt.lewagon.com/placeholder/users/ssaunier", class: "avatar dropdown-toggle", id: "navbar-wagon-menu", "data-toggle" => "dropdown" %>
+          <ul class="dropdown-menu dropdown-menu-right navbar-wagon-dropdown-menu">
+            <div id="notifications">
+              <%#= render @notifications %>
+            </div>
+          </ul>
+        </div>
+      </div>
+
+     <% end %>
+  </div>
+```
+#### Rendering with Javascript
+We're using webpacker, so we'll set up a `notifications.js` file in `app/javascript/components` that's imported in the `application.js` entry point:
+```javascript
+import '../components/notifications.js';
+```
+First we'll add a function to load the notifications using `fetch` from the endpoint we created:
+```javascript
+// app/javacript/components/notifications.js
+
+function loadNotifications() {
+  fetch('/notifications', {
+          method: 'get',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-Token': Rails.csrfToken()
+          },
+          credentials: 'same-origin'
+        })
+  .then(response => response.json())
+  .then(data => {
+    renderCounter(data.array.length);
+    refreshNotifications(renderNotifications(data.array));
+  })
+};
+```
+`renderCounter` will add a `<span>` element to the navbar with the number of unread notifications for the current user:
+```javascript
+// app/javacript/components/notifications.js
+
+function renderCounter(number) {
+  counter.insertAdjacentHTML('afterbegin',
+    `<span id="counter" class="notifications text-center">${number}</span>`
+  )
+};
+```
+`renderNotifications` will return a string with the HTML for all the notifications and `refreshNotifications` takes an HTML string and adds it to the dropdown in the notifications section:
+```javascript
+// app/javacript/components/notifications.js
+
+function renderNotifications(notifications) {
+  return notifications.map(notification => {
+    return(
+      `<li class="notification">
+      <strong>${notification.actor}</strong>
+      ${notification.action}
+      ${notification.notifiable.type}
+      </li>
+      `
+    )
+  }).join('');
+};
+
+function refreshNotifications(notificationsHTML) {
+  const notifications = document.getElementById('notifications');
+  notifications.innerHTML = notificationsHTML;
+};
+```
+We also need a function to mark messages as read once the user clicks on the navbar to open the dropdown and a function to update the unread messages counter:
+```javascript
+// app/javacript/components/notifications.js
+
+function markAsRead() {
+  fetch('/notifications/mark_as_read', {
+          method: 'post',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-Token': Rails.csrfToken()
+          },
+          credentials: 'same-origin'
+        })
+  .then(response => {
+    if (response.status === 200) {
+      refreshCounter(0);
+    }
+  })
+};
+
+function refreshCounter(number) {
+  const counterElement = document.getElementById('counter');
+  counterElement.innerHTML = number;
+};
+```
+
+Finally, we set up the logic at the end of the file:
+```javascript
+// app/javacript/components/notifications.js
+
+const notifications = document.querySelector('[data-behavior="notifications"]');
+const counter = document.querySelector('[data-behavior="notifications-counter"]');
+
+if (notifications) {
+  loadNotifications()
+}
+
+if (counter) {
+  counter.addEventListener('click', markAsRead)
+}
+```

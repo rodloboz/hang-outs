@@ -1,0 +1,8 @@
+<div class="chat_appointment">
+  <div class="appointment-time"><%= 2.days.from_now.strftime("%A, %d %B %Y at %l %P") %></div>
+  <div class="appointment-body">John wants to set an appointment with you.</div>
+  <div class="appointment-button">
+      <%= link_to 'Accept', '#', class: 'btn btn-default btn-primary' %>
+      <%= link_to 'Reject', '#', class: 'btn btn-default btn-primary' %>
+  </div>
+</div>

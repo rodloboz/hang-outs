@@ -10,10 +10,23 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema.define(version: 2018_06_12_092001) do
+ActiveRecord::Schema.define(version: 2019_02_27_143309) do
 
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
+
+  create_table "appointments", force: :cascade do |t|
+    t.string "organizer_id"
+    t.string "guest_id"
+    t.integer "status", default: 0, null: false
+    t.datetime "start_time"
+    t.datetime "end_time"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["guest_id"], name: "index_appointments_on_guest_id"
+    t.index ["organizer_id", "guest_id"], name: "index_appointments_on_organizer_id_and_guest_id", unique: true
+    t.index ["organizer_id"], name: "index_appointments_on_organizer_id"
+  end
 
   create_table "chats", force: :cascade do |t|
     t.integer "sender_id"

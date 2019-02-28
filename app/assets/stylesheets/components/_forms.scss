@@ -1,0 +1,20 @@
+.chat_appointment {
+  max-width: 350px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+
+  .appointment-time {
+    width: 100%;
+    padding: 15px;
+    background-color: $brand-primary;
+    color: white;
+    font-size: 14px;
+    font-weight: lightest;
+    border-radius: 2px;
+  }
+  .appointment-button {
+    margin-top: 20px;
+  }
+}

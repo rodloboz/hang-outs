@@ -9,6 +9,7 @@ Rails app generated with [lewagon/rails-templates](https://github.com/lewagon/ra
 * [Mutual friendship](#mutual-friendship)
 * [Live chat](#live-chat)
 * [In App Notifications](#in-app-notifications)
+* [Live Appointments Scheduler](#live-appointments-scheduler)
 
 
 ## Getting started
@@ -1124,3 +1125,356 @@ if (counterTrigger) {
 }
 ```
 That's it! Your app should be ready to receive realtime notifications.
+
+## Live Appointments Scheduler
+
+Let's add a live appointment shceduler to our chat system. The scheduler system should parse every chat message and detect if there are any time references. It there are, it will ask the user if they want to create an appointment request and then ask the recipient if they want to accept that appointment request.
+
+We will be using ActionCable and the Chronic gem to parse time string expressions.
+
+Add `gem 'chronic'` to the Gemfile.
+
+First, we'll create the Appointment model. An appointment belongs to an Organizer (`User`) and to a Guest(`User`). It has a `status` and a `start_time`.
+
+Create the following migration:
+
+```ruby
+class CreateAppointments < ActiveRecord::Migration[5.2]
+  def change
+    create_table :appointments do |t|
+      t.integer :organizer_id
+      t.integer :guest_id
+      t.integer :status, null: false, default: 0
+      t.datetime :start_time
+
+       t.timestamps
+    end
+
+    add_index :appointments, :organizer_id
+    add_index :appointments, :guest_id
+  end
+end
+```
+
+And the model should look like this:
+
+```ruby
+class Appointment < ApplicationRecord
+  belongs_to :organizer, foreign_key: :organizer_id, class_name: 'User'
+  belongs_to :guest, foreign_key: :guest_id, class_name: 'User'
+
+   enum status: [:pending, :accepted, :cancelled, :rejected]
+
+   scope :requested_to, -> (user) {
+    where("appointments.guest_id = ?", user).pending
+  }
+
+   def appointment_time
+    minutes = start_time.min > 0 ? ":%M" : ""
+    start_time.in_time_zone("Jerusalem").strftime("%A, %d %B %Y at %-l#{minutes} %P")
+  end
+end
+```
+
+We need to modify the `send_message` method we created for our [Live chat](#live-chat) system.
+
+```ruby
+def send_message(payload)
+    message = Message.new(user: current_user, chat_id: payload["id"], body: payload["message"])
+
+    ActionCable.server.broadcast "chat_#{payload['id']}", message: render_message(message) if message.save
+
+    suggested_time = TimeCop.new(message.body).perform
+
+    suggest_appointment(suggested_time, payload["id"]) if suggested_time
+  end
+ ```
+
+ For every message received by the ActionCable `ChatChannel`, we'll call in a service to parse the message and check for time references. If our `TimeCop` service finds a time, we´ll call a `suggest_appointment` to show an `Appointment` form to the *sender* of the message.
+
+The service class code looks like this:
+
+```ruby
+class TimeCop
+  EXP = /(?:(?:\b(?:next|this)\b\s+)?\b(?:tomorrow|month|evening|afternoon|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b(?:\s+(?:morning|afternoon|evening|night))?|\bin\b\s+\d\d?\s+(?:day|month|week)s?|(?:(?:\d\d?\s+)?\b(?:january|february|march|april|may|june|july|august|september|november|december)\b(?:\s+\d\d?)?))(?:(?:\s+at\b)\s+(?:(?:[01]\d)|2[0-4]|[1-9](?:\:[0-5]\d)?)?(?:\s+(?:am|a.m.|pm|p.m)?)?)?/i
+
+   def initialize(text)
+    @text = text
+  end
+
+   def perform
+    parse_text
+  end
+
+   private
+
+   attr_reader :text
+
+   def scan_text
+    matches = text.downcase.scan(EXP).first
+  end
+
+   def parse_text
+    Chronic.parse(scan_text)
+  end
+end
+```
+
+In order to suggest an appointment creation for the send of the message, we need to add the following method to the `ChatChannel` class:
+
+```ruby
+def suggest_appointment(suggested_time, chat_id)
+    chat = Chat.find(chat_id)
+    guest = chat.sender == current_user ? chat.recipient : chat.sender
+    appointment = Appointment.new(
+      organizer: current_user,
+      guest: guest,
+      start_time: suggested_time
+    )
+
+     sleep(1)
+
+     ChatNotificationRelayJob.perform_later current_user.id, chat.id, render_suggestion(appointment, chat)
+end
+```
+
+We want to send this appointment suggestion to the user, but only to sender of the message. If we broadcast to the chat channel, *all subscribers* will see the message.
+
+Therefore, we'll create a new Channel to send unique user notifications scoped to a chat channel. We'll use a background job to send the suggested appointment to the ChatNotificationsChannel.
+
+```ruby
+class ChatNotificationRelayJob < ApplicationJob
+  queue_as :default
+
+   def perform(recipient_id, chat_id, message)
+    ActionCable.server.broadcast "notifications:#{recipient_id}_for_chat_#{chat_id}", message: message
+  end
+end
+```
+
+And this is our ChatNotificationsChannel:
+
+```ruby
+class ChatNotificationsChannel < ApplicationCable::Channel
+  def subscribed
+    Chat.involving(current_user).each do |chat|
+      stream_from "notifications:#{current_user.id}_for_chat_#{chat.id}"
+    end
+  end
+
+   def request_appointment(payload)
+    chat = Chat.find(payload["id"])
+    guest = chat.sender == current_user ? chat.recipient : chat.sender
+
+     appointment = Appointment.new(organizer: current_user, guest: guest, start_time: payload["start_time"])
+
+     ActionCable.server.broadcast "notifications:#{guest.id}_for_chat_#{chat.id}", message: render_request(appointment) if appointment.save
+  end
+
+   def unsubscribed
+    stop_all_streams
+  end
+
+   private
+
+   def render_request(appointment)
+    ApplicationController.render(
+          partial: 'appointments/request',
+          locals: {appointment: appointment}
+      )
+  end
+end
+```
+
+The `request_appointment` method will be called from the frontend with **javascript** when the *sender/organizer* confirms that they want to create and Appointment and will then send an appointment request to the other user in the chat.
+
+The other user will then have the choice to either **accept** or **reject** the appointment request. If the **reject**, we just need to remove the appointment request widget from the chat view and tell our backend to change the **status** of the appointment to `:rejected`.
+
+We need the following routes:
+```ruby
+resources :appointments, only: :index do
+    member do
+      post :accept
+      post :reject
+    end
+end
+````
+
+If the user **accepts** the appointment, we want to show the *creator/organizer*  of the appointment a confirmation/acceptance *widget*.
+
+Let's setup the *frontend* now. We need to subscribe users to the `ChatNotificationsChannel`. We'll do this in `app/javascript/client/chat_notifications.js`:
+
+```javascript
+import createChannel from 'client/cable';
+
+ let callback; // declaring a variable that will hold a function later
+
+ const chatNotifications = createChannel('ChatNotificationsChannel', {
+  received(data) {
+    if (callback) callback.call(null, data);
+  }
+});
+
+ function sendRequest(startTime, chatId) {
+  chatNotifications.perform('request_appointment', { start_time: startTime, id: chatId});
+};
+
+ function setCallback(fn) {
+  callback = fn;
+}
+
+ export { setCallback, sendRequest };
+ ```
+
+ We'll then have the main functionalities implements in a `chat_widgets.js`. Don't forget to setup `rails-ujs` in the project with `yarn` and import everything in the main `application.js`.
+
+ ```javascript
+import Rails from 'rails-ujs';
+import { setCallback, sendRequest } from 'client/chat_notifications';
+
+function submitRequest(form, chatId) {
+  const startTime = form.querySelector('#appointment_start_time').value;
+  sendRequest(startTime, chatId);
+
+  form.parentNode.remove();
+};
+
+function bindSuggestionEvents(form) {
+  const chatId = form.getAttribute('action').split('/')[2];
+  const submit = form.querySelector('.appointment-form--submit');
+
+  submit.addEventListener('click', event => {
+    event.preventDefault();
+    submitRequest(form, chatId);
+  });
+};
+
+function bindRequestEvents(request) {
+  const appointmentId = request.dataset.appointmentid;
+  const rejectBtn = request.querySelector('.btn-reject');
+  const acceptBtn = request.querySelector('.btn-accept');
+
+  rejectBtn.addEventListener('click', event => {
+    event.preventDefault();
+    fetch(`/appointments/${appointmentId}/reject`, {
+      method: 'post',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRF-Token': Rails.csrfToken()
+      },
+      credentials: 'same-origin'
+    })
+      .then(response => request.remove());
+  });
+
+  acceptBtn.addEventListener('click', event => {
+    event.preventDefault();
+    fetch(`/appointments/${appointmentId}/accept`, {
+      method: 'post',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRF-Token': Rails.csrfToken()
+      },
+      credentials: 'same-origin'
+    })
+      .then(response => request.remove());
+  });
+};
+
+function scrollToBottom(element) {
+  // eslint-disable-next-line
+  element.scrollTop = element.scrollHeight;
+}
+
+const messages = document.querySelector('.messages');
+
+if (messages) {
+  const content = messages.querySelector(".messages--content");
+
+  const requests = document.querySelectorAll('.chat_appointment.request');
+
+  requests.forEach(request => bindRequestEvents(request));
+
+  scrollToBottom(content);
+
+  // Telling `chat.js` to call this piece of code whenever a new message is received
+  // over ActionCable
+  setCallback(({message}) => {
+    const div = document.createElement('div');
+
+    div.innerHTML = message;
+
+    const dismiss = div.querySelector('.appointment-dismiss');
+    const form = div.querySelector('#new_appointment');
+    const request = div.querySelector('.chat_appointment.request');
+
+    if (dismiss) dismiss.addEventListener('click', () => div.remove());
+    content.appendChild(div);
+    // content.insertAdjacentHTML("beforeend", div);
+
+    if (form) bindSuggestionEvents(form);
+
+    if (request) bindRequestEvents(request);
+
+    scrollToBottom(content);
+  });
+}
+```
+
+We also want to render the last Appointment requests in the chat window when the user navigates to that route from the outside. Modify the `chats#show` controller action:
+
+```ruby
+def show
+    @chat = Chat.find(params[:id])
+    @other_user = current_user == @chat.sender ? @chat.recipient : @chat.sender
+    @messages = @chat.messages.order(created_at: :asc).last(20)
+    @requests = Appointment.requested_to(current_user)
+    @message = Message.new
+end
+```
+
+And add to the corresponding *erb* template after you render the messages:
+
+```ruby
+<%= render 'appointments/request', appointment: @requests.last if @requests.any? %>
+````
+
+Finally, he are the views for the 3 chat widgets:
+
+```html
+<!-- app/views/appointments/_suggestion.html.erb -->
+<%= simple_form_for [chat, appointment] do |f| %>
+  <%= f.input :start_time, as: :hidden, value: appointment.appointment_time %>
+  <div class="chat_appointment">
+    <div class="appointment-time"><%= appointment.appointment_time %></div>
+    <div class="appointment-body">Do you want to create this appointment?</div>
+    <div class="appointment-button">
+      <%= f.submit 'Request', class: 'btn btn-default btn-primary appointment-form--submit' %>
+      <div class="btn btn-default btn-primary appointment-dismiss">Dismiss</div>
+    </div>
+  </div>
+<% end %>
+```
+
+```html
+<!-- app/views/appointments/_request.html.erb -->
+<div class="chat_appointment request" data-appointmentId="<%= appointment.id %>">
+  <div class="appointment-time"><%= appointment.appointment_time %></div>
+  <div class="appointment-body"><%= appointment.organizer.first_name %> wants to set an appointment with you.</div>
+  <div class="appointment-button">
+    <div class="btn btn-default btn-primary btn-accept">Accept</div>
+    <div class="btn btn-default btn-primary btn-reject">Reject</div>
+  </div>
+</div>
+```
+
+```html
+<!-- app/views/appointments/_accepted.html.erb -->
+<div class="chat_appointment">
+  <div class="appointment-time"><%= appointment.appointment_time %></div>
+  <div class="appointment-body"><%= appointment.guest.first_name %> accepted your appointment request.</div>
+  <div class="appointment-button">
+    <div class="btn btn-default btn-primary appointment-dismiss">Dismiss</div>
+  </div>
+</div>
+```

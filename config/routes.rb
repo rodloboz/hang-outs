@@ -13,6 +13,14 @@ Rails.application.routes.draw do
 
   resources :chats, only: [:index, :show, :create] do
     resources :messages, only: [:create]
+    resources :appointments, only: [:create]
+  end
+
+  resources :appointments, only: :index do
+    member do
+      post :accept
+      post :reject
+    end
   end
 
   resources :notifications, only: [:index] do

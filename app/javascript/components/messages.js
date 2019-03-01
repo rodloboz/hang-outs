@@ -15,7 +15,18 @@ if (messages) {
   // Telling `chat.js` to call this piece of code whenever a new message is received
   // over ActionCable
   setCallback(message => {
-    content.insertAdjacentHTML("beforeend", message);
+    const div = document.createElement('div');
+
+    div.innerHTML = message;
+
+    const dismiss = div.querySelector('.appointment-dismiss');
+    const form = div.querySelector('#new_appointment');
+
+    if (dismiss) dismiss.addEventListener('click', () => div.remove());
+    content.appendChild(div);
+    // content.insertAdjacentHTML("beforeend", div);
+
+    if (form) bindRequestEvent(form);
 
     scrollToBottom(content);
   });

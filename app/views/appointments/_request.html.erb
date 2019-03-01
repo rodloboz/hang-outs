@@ -1,0 +1,10 @@
+<div class="chat_appointment request" data-appointmentId="<%= appointment.id %>">
+  <div class="appointment-time"><%= appointment.appointment_time %></div>
+  <div class="appointment-body"><%= appointment.organizer.first_name %> wants to set an appointment with you.</div>
+  <div class="appointment-button">
+    <div class="btn btn-default btn-primary btn-accept">Accept</div>
+    <%#= link_to 'Accept', accept_appointment_path(appointment), class: 'btn btn-default btn-primary btn-accept', method: :post %>
+    <div class="btn btn-default btn-primary btn-reject">Reject</div>
+    <%#= link_to 'Reject', reject_appointment_path(appointment), class: 'btn btn-default btn-primary btn-reject', method: :post %>
+  </div>
+</div>

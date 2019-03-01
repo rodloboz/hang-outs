@@ -24,7 +24,6 @@ ActiveRecord::Schema.define(version: 2019_02_27_143309) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.index ["guest_id"], name: "index_appointments_on_guest_id"
-    t.index ["organizer_id", "guest_id"], name: "index_appointments_on_organizer_id_and_guest_id", unique: true
     t.index ["organizer_id"], name: "index_appointments_on_organizer_id"
   end
 

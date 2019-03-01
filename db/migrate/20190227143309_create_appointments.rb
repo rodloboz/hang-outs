@@ -12,6 +12,5 @@ class CreateAppointments < ActiveRecord::Migration[5.2]
 
     add_index :appointments, :organizer_id
     add_index :appointments, :guest_id
-    add_index :appointments, [:organizer_id, :guest_id], unique: true
   end
 end

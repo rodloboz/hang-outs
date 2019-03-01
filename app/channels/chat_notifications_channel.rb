@@ -11,7 +11,7 @@ class ChatNotificationsChannel < ApplicationCable::Channel
 
     appointment = Appointment.new(organizer: current_user, guest: guest, start_time: payload["start_time"])
 
-    ActionCable.server.broadcast "notifications:#{guest.id}_for_chat_#{chat.id}", suggestion: render_request(appointment) if appointment.save
+    ActionCable.server.broadcast "notifications:#{guest.id}_for_chat_#{chat.id}", message: render_request(appointment) if appointment.save
   end
 
   def unsubscribed

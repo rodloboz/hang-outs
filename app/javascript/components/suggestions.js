@@ -1,20 +1,52 @@
+import Rails from 'rails-ujs';
 import { setCallback, sendRequest } from 'client/chat_notifications';
 
 function submitRequest(form, chatId) {
   const startTime = form.querySelector('#appointment_start_time').value;
   sendRequest(startTime, chatId);
 
-  console.log('sending request...')
   form.parentNode.remove();
 };
 
-function bindRequestEvent(form) {
+function bindSuggestionEvent(form) {
   const chatId = form.getAttribute('action').split('/')[2];
   const submit = form.querySelector('.appointment-form--submit');
 
   submit.addEventListener('click', event => {
     event.preventDefault();
     submitRequest(form, chatId);
+  });
+};
+
+function bindRequestEvent(request) {
+  const appointmentId = request.dataset.appointmentid;
+  const rejectBtn = request.querySelector('.btn-reject');
+  const acceptBtn = request.querySelector('.btn-accept');
+
+  rejectBtn.addEventListener('click', event => {
+    event.preventDefault();
+    fetch(`/appointments/${appointmentId}/reject`, {
+      method: 'post',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRF-Token': Rails.csrfToken()
+      },
+      credentials: 'same-origin'
+    })
+      .then(response => request.remove());
+  });
+
+  acceptBtn.addEventListener('click', event => {
+    event.preventDefault();
+    fetch(`/appointments/${appointmentId}/accept`, {
+      method: 'post',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRF-Token': Rails.csrfToken()
+      },
+      credentials: 'same-origin'
+    })
+      .then(response => request.remove());
   });
 };
 
@@ -27,6 +59,10 @@ const messages = document.querySelector('.messages');
 
 if (messages) {
   const content = messages.querySelector(".messages--content");
+
+  const requests = document.querySelectorAll('.chat_appointment.request');
+
+  requests.forEach(request => bindRequestEvent(request));
 
   scrollToBottom(content);
 
@@ -44,7 +80,7 @@ if (messages) {
     content.appendChild(div);
     // content.insertAdjacentHTML("beforeend", div);
 
-    if (form) bindRequestEvent(form);
+    if (form) bindSuggestionEvent(form);
 
     scrollToBottom(content);
   });

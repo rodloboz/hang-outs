@@ -1,10 +1,11 @@
 <%= simple_form_for [chat, appointment] do |f| %>
-  <%= f.input :start_time, as: :hidden, value: 2.days.from_now %>
+  <%= f.input :start_time, as: :hidden, value: appointment.appointment_time %>
   <div class="chat_appointment">
-    <div class="appointment-time"><%= 2.days.from_now.strftime("%A, %d %B %Y at %l %P") %></div>
+    <div class="appointment-time"><%= appointment.appointment_time %></div>
     <div class="appointment-body">Do you want to create this appointment?</div>
     <div class="appointment-button">
-      <%= f.submit 'Set Appointment', class: 'btn btn-default btn-primary' %>
+      <%= f.submit 'Request', class: 'btn btn-default btn-primary appointment-form--submit' %>
+      <div class="btn btn-default btn-primary appointment-dismiss">Dismiss</div>
     </div>
   </div>
 <% end %>

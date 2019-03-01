@@ -1,5 +1,5 @@
 // we need to import sendMessage from our client/chat.js
-import { sendMessage } from "../client/chat";
+import { sendMessage } from '../client/chat';
 
 function submitMessage(inputMessage, inputChatId) {
   // Invokes sendMessage, that, in turn, invokes Ruby send_message method
@@ -7,7 +7,7 @@ function submitMessage(inputMessage, inputChatId) {
   sendMessage(inputMessage.value, inputChatId.value);
 
   // eslint-disable-next-line
-  inputMessage.value = "";
+  inputMessage.value = '';
   inputMessage.focus();
 }
 

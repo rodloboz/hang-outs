@@ -11,32 +11,34 @@ class ChatChannel < ApplicationCable::Channel
 
     ActionCable.server.broadcast "chat_#{payload['id']}", message: render_message(message) if message.save
 
-    suggestion = TimeScanner.new(message.body).perform
+    suggested_time = TimeCop.new(message.body).perform
 
     suggest_appointment(suggested_time, payload["id"]) if suggested_time
   end
 
   def suggest_appointment(suggested_time, chat_id)
-    chat: @chat, appointment: Appointment.new
     chat = Chat.find(chat_id)
-    guest = chat.sender == current_user ? recipient : sender
+    guest = chat.sender == current_user ? chat.recipient : chat.sender
     appointment = Appointment.new(
       organizer: current_user,
       guest: guest,
       start_time: suggested_time
     )
 
-    ActionCable.server.broadcast "chat_#{chat_id}", suggestion: render_suggestion(appointment, chat)
+    sleep(1)
+
+    ActionCable.server.broadcast "chat_#{chat_id}", message: render_suggestion(appointment, chat)
   end
 
   def request_appointment(payload)
-    chat = Chat.find(chat_id)
-    guest = chat.sender == current_user ? recipient : sender
+    chat = Chat.find(payload["id"])
+    guest = chat.sender == current_user ? chat.recipient : chat.sender
 
-    appointment = Appointment.new(organizer: current_user, guest: guest, start_time: suggested_time )
+    appointment = Appointment.new(organizer: current_user, guest: guest, start_time: payload["start_time"])
+    byebug
 
-    puts "******************** DEBUGGGGG *************************"
-    ActionCable.server.broadcast "chat_#{chat_id}", suggestion: render_suggestion(appointment, chat) if message.save
+    # puts "******************** DEBUGGGGG *************************"
+    # ActionCable.server.broadcast "chat_#{chat_id}", suggestion: render_suggestion(appointment, chat) if message.save
   end
 
   def accept_appointment

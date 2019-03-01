@@ -8,7 +8,7 @@ function submitRequest(form, chatId) {
   form.parentNode.remove();
 };
 
-function bindSuggestionEvent(form) {
+function bindSuggestionEvents(form) {
   const chatId = form.getAttribute('action').split('/')[2];
   const submit = form.querySelector('.appointment-form--submit');
 
@@ -18,7 +18,7 @@ function bindSuggestionEvent(form) {
   });
 };
 
-function bindRequestEvent(request) {
+function bindRequestEvents(request) {
   const appointmentId = request.dataset.appointmentid;
   const rejectBtn = request.querySelector('.btn-reject');
   const acceptBtn = request.querySelector('.btn-accept');
@@ -62,7 +62,7 @@ if (messages) {
 
   const requests = document.querySelectorAll('.chat_appointment.request');
 
-  requests.forEach(request => bindRequestEvent(request));
+  requests.forEach(request => bindRequestEvents(request));
 
   scrollToBottom(content);
 
@@ -75,12 +75,15 @@ if (messages) {
 
     const dismiss = div.querySelector('.appointment-dismiss');
     const form = div.querySelector('#new_appointment');
+    const request = div.querySelector('.chat_appointment.request');
 
     if (dismiss) dismiss.addEventListener('click', () => div.remove());
     content.appendChild(div);
     // content.insertAdjacentHTML("beforeend", div);
 
-    if (form) bindSuggestionEvent(form);
+    if (form) bindSuggestionEvents(form);
+
+    if (request) bindRequestEvents(request);
 
     scrollToBottom(content);
   });

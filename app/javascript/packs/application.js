@@ -1,4 +1,5 @@
 import 'bootstrap';
-import '../components/message-form.js';
-import '../components/messages.js';
-import '../components/notifications.js';
+import '../components/message-form';
+import '../components/messages';
+import '../components/suggestions';
+import '../components/notifications';

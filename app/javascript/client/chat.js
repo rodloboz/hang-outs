@@ -14,10 +14,6 @@ function sendMessage(message, chatId) {
   chat.perform('send_message', { message: message, id: chatId });
 };
 
-function sendRequest(startTime, chatId) {
-  chat.perform('request_appointment', { start_time: startTime, id: chatId});
-};
-
 // Getting a message: this callback will be invoked once we receive
 // something over ChatChannel
 function setCallback(fn) {

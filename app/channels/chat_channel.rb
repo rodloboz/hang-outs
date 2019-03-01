@@ -27,21 +27,7 @@ class ChatChannel < ApplicationCable::Channel
 
     sleep(1)
 
-    ActionCable.server.broadcast "chat_#{chat_id}", message: render_suggestion(appointment, chat)
-  end
-
-  def request_appointment(payload)
-    chat = Chat.find(payload["id"])
-    guest = chat.sender == current_user ? chat.recipient : chat.sender
-
-    appointment = Appointment.new(organizer: current_user, guest: guest, start_time: payload["start_time"])
-    byebug
-
-    # puts "******************** DEBUGGGGG *************************"
-    # ActionCable.server.broadcast "chat_#{chat_id}", suggestion: render_suggestion(appointment, chat) if message.save
-  end
-
-  def accept_appointment
+    ChatNotificationRelayJob.perform_later current_user.id, chat.id, render_suggestion(appointment, chat)
   end
 
   def unsubscribed
@@ -61,6 +47,13 @@ class ChatChannel < ApplicationCable::Channel
     ApplicationController.render(
           partial: 'appointments/suggestion',
           locals: {chat: chat, appointment: appointment}
+      )
+  end
+
+  def render_request(appointment)
+    ApplicationController.render(
+          partial: 'appointments/request',
+          locals: {appointment: appointment}
       )
   end
 end

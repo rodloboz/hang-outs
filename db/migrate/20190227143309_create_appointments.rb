@@ -1,8 +1,8 @@
 class CreateAppointments < ActiveRecord::Migration[5.2]
   def change
     create_table :appointments do |t|
-      t.string :organizer_id
-      t.string :guest_id
+      t.integer :organizer_id
+      t.integer :guest_id
       t.integer :status, null: false, default: 0
       t.datetime :start_time
       t.datetime :end_time

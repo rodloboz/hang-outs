@@ -1,4 +1,22 @@
-import { setCallback } from 'client/chat';
+import { setCallback, sendRequest } from 'client/chat_notifications';
+
+function submitRequest(form, chatId) {
+  const startTime = form.querySelector('#appointment_start_time').value;
+  sendRequest(startTime, chatId);
+
+  console.log('sending request...')
+  form.parentNode.remove();
+};
+
+function bindRequestEvent(form) {
+  const chatId = form.getAttribute('action').split('/')[2];
+  const submit = form.querySelector('.appointment-form--submit');
+
+  submit.addEventListener('click', event => {
+    event.preventDefault();
+    submitRequest(form, chatId);
+  });
+};
 
 function scrollToBottom(element) {
   // eslint-disable-next-line
@@ -14,7 +32,7 @@ if (messages) {
 
   // Telling `chat.js` to call this piece of code whenever a new message is received
   // over ActionCable
-  setCallback(message => {
+  setCallback(({message}) => {
     const div = document.createElement('div');
 
     div.innerHTML = message;

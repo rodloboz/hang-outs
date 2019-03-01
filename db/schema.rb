@@ -16,8 +16,8 @@ ActiveRecord::Schema.define(version: 2019_02_27_143309) do
   enable_extension "plpgsql"
 
   create_table "appointments", force: :cascade do |t|
-    t.string "organizer_id"
-    t.string "guest_id"
+    t.integer "organizer_id"
+    t.integer "guest_id"
     t.integer "status", default: 0, null: false
     t.datetime "start_time"
     t.datetime "end_time"
